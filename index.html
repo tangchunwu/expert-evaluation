@@ -586,7 +586,7 @@
     
     <div class="solutions-container">
         <div class="solution-box">
-            <div class="solution-header plan-a">🅰️ 方案A (Baseline)</div>
+            <div class="solution-header plan-a">🅰️ 方案A</div>
             <div class="solution-content"><pre>【处置方案】
 1. 临时封禁攻击源IP 203.0.113.45
    - 使用iptables命令：iptables -A INPUT -s 203.0.113.45 -j DROP
@@ -600,7 +600,7 @@
         </div>
         
         <div class="solution-box">
-            <div class="solution-header plan-b">🅱️ 方案B (V2.0)</div>
+            <div class="solution-header plan-b">🅱️ 方案B</div>
             <div class="solution-content"><pre>【自动处置Playbook】
 1. 关联CVE-2024-21732分析与补丁方案，确认受影响的应用及版本（详见NVD: https://nvd.nist.gov/vuln/detail/CVE-2024-21732）
 2. 生成封禁命令（含回退与检查）：
@@ -751,7 +751,7 @@
     
     <div class="solutions-container">
         <div class="solution-box">
-            <div class="solution-header plan-a">🅰️ 方案A (Baseline)</div>
+            <div class="solution-header plan-a">🅰️ 方案A</div>
             <div class="solution-content"><pre>- 威胁分析：判定为Log4j远程代码执行高危攻击（CVE-2021-44228）。
 - 影响面：攻击源IP对目标10.0.0.50:8080尝试利用JNDI注入，需警惕云边界资产被控。
 - 处置建议：  
@@ -765,7 +765,7 @@
         </div>
         
         <div class="solution-box">
-            <div class="solution-header plan-b">🅱️ 方案B (V2.0)</div>
+            <div class="solution-header plan-b">🅱️ 方案B</div>
             <div class="solution-content"><pre>- 风险识别：CVE-2021-44228（Log4Shell）攻击
   已关联ATT&amp;CK: T1210、T1203
   IOC: 源IP 45.33.32.156 → 10.0.0.50:8080
@@ -912,7 +912,7 @@
     
     <div class="solutions-container">
         <div class="solution-box">
-            <div class="solution-header plan-a">🅰️ 方案A (Baseline)</div>
+            <div class="solution-header plan-a">🅰️ 方案A</div>
             <div class="solution-content"><pre>【威胁分析】
 检测到目录遍历攻击，攻击者尝试通过 ../../../etc/passwd 读取敏感文件。
 
@@ -928,7 +928,7 @@
         </div>
         
         <div class="solution-box">
-            <div class="solution-header plan-b">🅱️ 方案B (V2.0)</div>
+            <div class="solution-header plan-b">🅱️ 方案B</div>
             <div class="solution-content"><pre>【威胁画像】
 - 攻击类型：目录遍历（Path Traversal）
 - ATT&amp;CK：TA0006、T1552
@@ -1075,7 +1075,7 @@
     
     <div class="solutions-container">
         <div class="solution-box">
-            <div class="solution-header plan-a">🅰️ 方案A (Baseline)</div>
+            <div class="solution-header plan-a">🅰️ 方案A</div>
             <div class="solution-content"><pre>【处置建议】
 1. 终止恶意进程
    kill -9 $(pgrep -f '/tmp/.exploit_dp')
@@ -1091,7 +1091,7 @@
         </div>
         
         <div class="solution-box">
-            <div class="solution-header plan-b">🅱️ 方案B (V2.0)</div>
+            <div class="solution-header plan-b">🅱️ 方案B</div>
             <div class="solution-content"><pre>【自动化Playbook】
 
 【Pre-check】  
@@ -1234,7 +1234,7 @@
     
     <div class="solutions-container">
         <div class="solution-box">
-            <div class="solution-header plan-a">🅰️ 方案A (Baseline)</div>
+            <div class="solution-header plan-a">🅰️ 方案A</div>
             <div class="solution-content"><pre>1. 【告警分析】  
    检测到IP 185.220.100.250 对 192.168.0.0/16 端口扫描，Nmap SYN扫描匹配。
    
@@ -1255,7 +1255,7 @@
         </div>
         
         <div class="solution-box">
-            <div class="solution-header plan-b">🅱️ 方案B (V2.0)</div>
+            <div class="solution-header plan-b">🅱️ 方案B</div>
             <div class="solution-content"><pre>1. 【威胁画像】  
    - 大规模扫描，源IP: 185.220.100.250
    - 工具: Nmap SYN + zgrab
@@ -1394,7 +1394,7 @@
     
     <div class="solutions-container">
         <div class="solution-box">
-            <div class="solution-header plan-a">🅰️ 方案A (Baseline)</div>
+            <div class="solution-header plan-a">🅰️ 方案A</div>
             <div class="solution-content"><pre>1. 登录192.168.1.150，连接MySQL。
 
 2. 修改root密码：
@@ -1407,7 +1407,7 @@
         </div>
         
         <div class="solution-box">
-            <div class="solution-header plan-b">🅱️ 方案B (V2.0)</div>
+            <div class="solution-header plan-b">🅱️ 方案B</div>
             <div class="solution-content"><pre>1. 连接数据库：mysql -u root -p
 
 2. 修改密码：
