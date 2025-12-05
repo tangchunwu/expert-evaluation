@@ -506,17 +506,21 @@
             content: attr(data-tip);
             position: absolute;
             bottom: 100%;
-            left: 50%;
-            transform: translateX(-50%);
+            left: 0;
+            transform: translateX(0);
             background: #1e293b;
             color: white;
             padding: 8px 12px;
             border-radius: 6px;
             font-size: 12px;
-            white-space: nowrap;
+            max-width: 260px;
+            white-space: normal;
+            word-break: break-word;
+            text-align: left;
             opacity: 0;
             pointer-events: none;
             transition: opacity 0.2s;
+            z-index: 1000;
         }
         
         .tooltip:hover::after {
@@ -694,22 +698,22 @@ R=0.65(medium): 动作0.80+范围0.80+业务0.29 -&gt; ticket
             </thead>
             <tbody>
                 <tr>
-                    <td class="tooltip" data-tip="精准识别攻击类型，实体提取无误">意图理解 (25%)</td>
+                    <td class="tooltip" data-tip="看AI有没有真正看懂这条告警：攻击是什么、目标是谁、影响到什么业务，描述是否准确、不张冠李戴">意图理解 (25%)</td>
                     <td><div class="slider-container"><input type="range" class="rating-slider" name="planA_intent" min="1" max="5" step="0.1" value="3" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-value">3.0</span></div></td>
                     <td><div class="slider-container"><input type="range" class="rating-slider" name="planB_intent" min="1" max="5" step="0.1" value="3" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-value">3.0</span></div></td>
                 </tr>
                 <tr>
-                    <td class="tooltip" data-tip="CVE+ATT&CK+IOC完整关联">证据链完整性 (25%)</td>
+                    <td class="tooltip" data-tip="看证据是不是串起来了：有没有给出关键漏洞编号CVE、ATT&CK阶段、IP或域名等IOC，并说明它们之间的联系">证据链完整性 (25%)</td>
                     <td><div class="slider-container"><input type="range" class="rating-slider" name="planA_evidence" min="1" max="5" step="0.1" value="3" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-value">3.0</span></div></td>
                     <td><div class="slider-container"><input type="range" class="rating-slider" name="planB_evidence" min="1" max="5" step="0.1" value="3" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-value">3.0</span></div></td>
                 </tr>
                 <tr>
-                    <td class="tooltip" data-tip="具体命令可直接执行">Playbook可执行性 (30%)</td>
+                    <td class="tooltip" data-tip="看处置步骤能不能照着就干：有没有写出可执行的具体命令或操作步骤，而不是只有笼统的安全建议">Playbook可执行性 (30%)</td>
                     <td><div class="slider-container"><input type="range" class="rating-slider" name="planA_playbook" min="1" max="5" step="0.1" value="3" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-value">3.0</span></div></td>
                     <td><div class="slider-container"><input type="range" class="rating-slider" name="planB_playbook" min="1" max="5" step="0.1" value="3" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-value">3.0</span></div></td>
                 </tr>
                 <tr>
-                    <td class="tooltip" data-tip="有回退命令和执行前检查">业务安全性 (20%)</td>
+                    <td class="tooltip" data-tip="看方案会不会误伤业务：有没有执行前检查、影响评估和回退命令，能在控制风险的同时保障业务连续性">业务安全性 (20%)</td>
                     <td><div class="slider-container"><input type="range" class="rating-slider" name="planA_safety" min="1" max="5" step="0.1" value="3" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-value">3.0</span></div></td>
                     <td><div class="slider-container"><input type="range" class="rating-slider" name="planB_safety" min="1" max="5" step="0.1" value="3" oninput="this.nextElementSibling.textContent=this.value"><span class="slider-value">3.0</span></div></td>
                 </tr>
